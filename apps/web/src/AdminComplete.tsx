@@ -1,0 +1,40 @@
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
+import { CheckCircle2, Plus, RefreshCw, ShieldCheck, UserRound, UserX } from 'lucide-react';
+import { API } from './api';
+
+type User = { id: string; name: string; email: string; role: string; isActive: boolean; createdAt: string };
+type Log = { id: string; action: string; entity: string; createdAt: string; user?: { name: string } | null };
+
+async function responseData(response: Response) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message ?? 'The request could not be completed.');
+  return data;
+}
+
+export function UsersPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'STAFF' });
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const load = async () => { setLoading(true); setError(''); try { const data = await responseData(await fetch(`${API}/users`, { credentials: 'include' })); setUsers(data.users ?? []); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load users.'); } finally { setLoading(false); } };
+  useEffect(() => { void load(); }, []);
+  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); setMessage(''); setError(''); try { await responseData(await fetch(`${API}/users`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })); setMessage(`${form.role === 'MANAGER' ? 'Manager' : 'Staff'} account created.`); setForm({ name: '', email: '', password: '', role: 'STAFF' }); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to create account.'); } finally { setSaving(false); } };
+  const disable = async (user: User) => { if (!user.isActive || !window.confirm(`Disable ${user.name}'s account? They will be signed out.`)) return; setMessage(''); setError(''); try { await responseData(await fetch(`${API}/users/${user.id}/disable`, { method: 'POST', credentials: 'include' })); setMessage('Account disabled.'); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to disable account.'); } };
+  return <section><div className="page-heading"><div><p className="eyebrow">ADMINISTRATION</p><h1>Users</h1><p className="muted">Manage authorized managers and staff accounts.</p></div><button className="secondary-button" onClick={() => void load()} disabled={loading} title="Refresh users"><RefreshCw size={16} /> Refresh</button></div>{message && <p className="success">{message}</p>}{error && <p className="error">{error}</p>}<form className="panel admin-form" onSubmit={submit}><div className="panel-heading"><div><p className="eyebrow">NEW ACCOUNT</p><h2>Add authorized user</h2></div><Plus size={22} color="#3b9686" /></div><div className="form-row"><label>Name<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label>Email<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label></div><div className="form-row"><label>Temporary password<input required minLength={8} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label><label>Role<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}><option value="STAFF">Staff</option><option value="MANAGER">Manager</option></select></label></div><button className="primary-button" disabled={saving}>{saving ? 'Creating...' : 'Create account'} <span>→</span></button></form><section className="panel"><div className="panel-heading"><div><p className="eyebrow">AUTHORIZED USERS</p><h2>Account directory</h2></div><UserRound size={22} color="#3b9686" /></div>{loading ? <div className="placeholder"><p className="muted">Loading users...</p></div> : users.length === 0 ? <div className="empty-state"><UserRound size={28} /><strong>No users found</strong></div> : users.map((user) => <div className="activity-row" key={user.id}><span className="activity-icon teal"><UserRound size={15} /></span><div><strong>{user.name}</strong><small>{user.email} · {user.role === 'MANAGER' ? 'Manager' : 'Staff'}</small></div><span className={user.isActive ? 'status healthy' : 'status'}>{user.isActive ? 'Active' : 'Disabled'}</span><button className="icon-button" onClick={() => void disable(user)} disabled={!user.isActive} title={user.isActive ? `Disable ${user.name}` : 'Account disabled'}><UserX size={16} /></button></div>)}</section></section>;
+}
+
+export function AuditLogsPage() {
+  const [logs, setLogs] = useState<Log[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const load = async () => { setLoading(true); try { const data = await responseData(await fetch(`${API}/audit-logs`, { credentials: 'include' })); setLogs(data.logs ?? []); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load audit logs.'); } finally { setLoading(false); } };
+  useEffect(() => { void load(); }, []);
+  return <section><div className="page-heading"><div><p className="eyebrow">CONTROL HISTORY</p><h1>Audit logs</h1><p className="muted">An immutable trail of important system actions.</p></div><button className="secondary-button" onClick={() => void load()} disabled={loading} title="Refresh audit logs"><RefreshCw size={16} /> Refresh</button></div>{error && <p className="error">{error}</p>}<section className="panel"><div className="panel-heading"><div><p className="eyebrow">RECENT EVENTS</p><h2>Activity trail</h2></div><ShieldCheck size={22} color="#3b9686" /></div>{loading ? <div className="placeholder"><p className="muted">Loading audit logs...</p></div> : logs.length === 0 ? <div className="empty-state"><ShieldCheck size={28} /><strong>No audit events yet</strong></div> : logs.map((log) => <div className="activity-row" key={log.id}><span className="activity-icon teal"><ShieldCheck size={15} /></span><div><strong>{log.action.replace(/_/g, ' ')}</strong><small>{log.entity}{log.user ? ` · ${log.user.name}` : ''}</small></div><time>{new Date(log.createdAt).toLocaleString()}</time></div>)}</section></section>;
+}
+
+export function SettingsPage() {
+  const [status, setStatus] = useState<'checking' | 'ready' | 'error'>('checking');
+  useEffect(() => { fetch(`${API}/ready`).then((response) => setStatus(response.ok ? 'ready' : 'error')).catch(() => setStatus('error')); }, []);
+  return <section><div className="page-heading"><div><p className="eyebrow">ADMINISTRATION</p><h1>Settings</h1><p className="muted">Review workspace configuration and service health.</p></div></div><div className="content-grid"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">WORKSPACE</p><h2>Sunrise Stores</h2></div><ShieldCheck size={22} color="#3b9686" /></div><div className="activity-row"><span className="activity-icon teal"><CheckCircle2 size={15} /></span><div><strong>Authorized access only</strong><small>Customer access is disabled. Managers control staff accounts.</small></div></div><div className="activity-row"><span className="activity-icon teal"><CheckCircle2 size={15} /></span><div><strong>Audit history enabled</strong><small>Important operational actions are recorded for review.</small></div></div></section><section className="panel"><div className="panel-heading"><div><p className="eyebrow">SERVICE HEALTH</p><h2>API and database</h2></div><ShieldCheck size={22} color="#3b9686" /></div><div className="activity-row"><span className="activity-icon teal"><CheckCircle2 size={15} /></span><div><strong>{status === 'checking' ? 'Checking connection...' : status === 'ready' ? 'Ready' : 'Unavailable'}</strong><small>Database readiness endpoint</small></div></div></section></div></section>;
+}

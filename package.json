@@ -1,0 +1,24 @@
+{
+  "name": "storeflow",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @storeflow/api\" \"npm run dev -w @storeflow/web\"",
+    "build": "npm run build -w @storeflow/api && npm run build -w @storeflow/web",
+    "start": "npm run start -w @storeflow/api",
+    "lint": "npm run lint -w @storeflow/api && npm run lint -w @storeflow/web",
+    "test": "npm run test -w @storeflow/api && npm run test -w @storeflow/web",
+    "format": "prettier --write .",
+    "db:generate": "npm run db:generate -w @storeflow/database",
+    "db:push": "npm run db:push -w @storeflow/database",
+    "db:migrate:deploy": "npm run db:migrate:deploy -w @storeflow/database",
+    "db:seed": "npm run db:seed -w @storeflow/database"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.2",
+    "prettier": "^3.4.2"
+  },
+  "engines": { "node": ">=20" }
+}
