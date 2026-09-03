@@ -94,5 +94,5 @@ app.get('/api/dashboard', requireAuth, async (_req, res, next) => { try { const 
 app.get('/api/manager-check', requireAuth, requireRole(Role.MANAGER), (_req, res) => res.json({ ok: true }));
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => { console.error(error); const statusCode = typeof error === 'object' && error !== null && 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 500; res.status(statusCode).json({ message: statusCode === 500 ? 'Something went wrong.' : (error as Error).message }); });
 
-if (require.main === module) { const server = app.listen(Number(process.env.PORT ?? process.env.API_PORT ?? 4000), () => console.log('StoreFlow API listening')); const shutdown = async () => { server.close(); await prisma.$disconnect(); }; process.once('SIGTERM', shutdown); process.once('SIGINT', shutdown); }
+if (process.env.VERCEL !== '1' && typeof require !== 'undefined' && require.main === module) { const server = app.listen(Number(process.env.PORT ?? process.env.API_PORT ?? 4000), () => console.log('StoreFlow API listening')); const shutdown = async () => { server.close(); await prisma.$disconnect(); }; process.once('SIGTERM', shutdown); process.once('SIGINT', shutdown); }
 export { app };
